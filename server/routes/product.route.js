@@ -9,7 +9,6 @@ import {
   deleteProduct,
   getBarcode,
   importProducts,
-  uploadProductFile,
 } from "../controllers/product.controller.js";
 
 const router = express.Router();
@@ -21,5 +20,5 @@ router.get("/product", getProducts);
 router.post("/product", createProduct);
 router.delete("/product/:id", deleteProduct);
 router.get("/product/barcode/:code", getBarcode);
-router.post("/product/import", uploadProductFile, importProducts);
+router.post("/product/import", importProducts);
 export default router;

@@ -298,10 +298,6 @@ export const getBarcode = async (req, res) => {
  */
 export const importProducts = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
-    // Read uploaded file
-    const workbook = xlsx.readFile(req.file.path);
     const sheetName = workbook.SheetNames[0];
     const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
@@ -353,8 +349,6 @@ export const importProducts = async (req, res) => {
 
       addedCount++;
     }
-
-    fs.unlinkSync(req.file.path);
 
     res.json({
       message: "Import completed successfully",
