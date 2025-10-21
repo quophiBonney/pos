@@ -14,19 +14,8 @@ import {
   ListItemText,
   Button,
   Divider,
-  Grid,
-  Card,
-  CardContent,
-  TextField,
-  Paper,
-  InputAdornment,
   Badge,
   Avatar,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -34,22 +23,17 @@ import {
   ShoppingCart as ShoppingCartIcon,
   People as PeopleIcon,
   BarChart as BarChartIcon,
-  Search as SearchIcon,
   Notifications as NotificationsIcon,
   AccountCircle,
   Inventory2,
+  AssignmentTurnedIn,
+  Group,
+  ReceiptLong,
+  Payment,
 } from "@mui/icons-material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
 
+// Import pages
 import Products from "../../pages/Products";
 import Suppliers from "../../pages/Suppliers";
 import Users from "../../pages/Users";
@@ -57,8 +41,10 @@ import Reports from "../../pages/Reports";
 import Roles from "../../pages/Roles";
 import Cart from "../../pages/Cart";
 import Orders from "../../pages/Orders";
+
 const drawerWidth = 260;
 
+// Theme setup
 const theme = createTheme({
   palette: {
     primary: { main: "#1976d2" },
@@ -69,37 +55,95 @@ const theme = createTheme({
     fontFamily: "'Inter', sans-serif",
     h6: { fontWeight: 600 },
   },
-  components: {
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
-        },
-      },
-    },
-  },
 });
 
+// ✅ Navigation items with role-based access
 const navItems = [
-  { id: "dashboard", label: "Dashboard", icon: <DashboardIcon /> },
-  { id: "sales", label: "Sales", icon: <BarChartIcon /> },
-  { id: "products", label: "Products", icon: <Inventory2 /> },
-  { id: "suppliers", label: "Suppliers", icon: <PeopleIcon /> },
-  { id: "cart", label: "Cart", icon: <PeopleIcon /> },
-  { id: "users", label: "Users", icon: <PeopleIcon /> },
-  { id: "reports", label: "Reports", icon: <BarChartIcon /> },
-  { id: "orders", label: "Orders", icon: <BarChartIcon /> },
-  { id: "roles", label: "Roles", icon: <PeopleIcon /> },
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: <DashboardIcon />,
+    roles: ["super admin", "admin", "manager", "cashier", "accountant"],
+  },
+  {
+    id: "sales",
+    label: "Sales",
+    icon: <BarChartIcon />,
+    roles: ["super admin", "admin", "manager"],
+  },
+  {
+    id: "products",
+    label: "Products",
+    icon: <Inventory2 />,
+    roles: ["super admin", "admin", "manager", "cashier"],
+  },
+  {
+    id: "suppliers",
+    label: "Suppliers",
+    icon: <PeopleIcon />,
+    roles: ["super admin", "admin", "manager"],
+  },
+  {
+    id: "cart",
+    label: "Cart",
+    icon: <ShoppingCartIcon />,
+    roles: ["super admin", "cashier", "admin"],
+  },
+  {
+    id: "users",
+    label: "Users",
+    icon: <Group />,
+    roles: ["super admin", "admin"],
+  },
+  {
+    id: "reports",
+    label: "Reports",
+    icon: <ReceiptLong />,
+    roles: ["super admin", "admin", "manager", "accountant"],
+  },
+  {
+    id: "orders",
+    label: "Orders",
+    icon: <AssignmentTurnedIn />,
+    roles: ["super admin", "admin", "manager", "cashier"],
+  },
+  {
+    id: "payments",
+    label: "Payments",
+    icon: <Payment />,
+    roles: ["super admin", "accountant"],
+  },
+  {
+    id: "roles",
+    label: "Roles",
+    icon: <PeopleIcon />,
+    roles: ["super admin", "admin"],
+  },
 ];
 
 export default function Dashboard() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("dashboard");
-  const [query, setQuery] = useState("");
+
+  // ✅ Get role from localStorage
+  const storedUser = JSON.parse(localStorage.getItem("user"));
+  const role = storedUser?.role?.toLowerCase() || "cashier";
+
+  // ✅ Define role checks
+  const isSuperAdmin = role === "super admin";
+  const isAdmin = role === "admin";
+  const isManager = role === "manager";
+  const isCashier = role === "cashier";
+  const isAccountant = role === "accountant";
+
+  // ✅ Filter menu items
+  const accessibleNavItems = isSuperAdmin
+    ? navItems // super admin sees all
+    : navItems.filter((item) => item.roles.includes(role));
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
+  // Sidebar content
   const drawer = (
     <Box
       sx={{ p: 2, height: "100%", display: "flex", flexDirection: "column" }}
@@ -109,13 +153,23 @@ export default function Dashboard() {
           CS POS
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Admin Panel
+          {isSuperAdmin
+            ? "Super Admin Panel"
+            : isAdmin
+            ? "Admin Panel"
+            : isManager
+            ? "Manager Panel"
+            : isAccountant
+            ? "Accountant Panel"
+            : "Cashier Panel"}
         </Typography>
       </Box>
+
       <Divider sx={{ mb: 2 }} />
 
+      {/* Sidebar menu items */}
       <List sx={{ flexGrow: 1 }}>
-        {navItems.map((item) => (
+        {accessibleNavItems.map((item) => (
           <ListItem key={item.id} disablePadding>
             <ListItemButton
               selected={activeNav === item.id}
@@ -139,12 +193,52 @@ export default function Dashboard() {
         ))}
       </List>
 
-      <Divider sx={{ mt: 2, mb: 1 }} />
-      <Button variant="contained" fullWidth>
-        + New Product
-      </Button>
+      {/* ✅ Show "Add Product" button only for Admin, Manager, Super Admin */}
+      {(isAdmin || isManager || isSuperAdmin) && (
+        <>
+          <Divider sx={{ mt: 2, mb: 1 }} />
+          <Button variant="contained" fullWidth>
+            + New Product
+          </Button>
+        </>
+      )}
     </Box>
   );
+
+  // ✅ Render correct page
+  const renderPage = () => {
+    switch (activeNav) {
+      case "products":
+        return <Products />;
+      case "suppliers":
+        return <Suppliers />;
+      case "users":
+        return <Users />;
+      case "reports":
+        return <Reports />;
+      case "roles":
+        return <Roles />;
+      case "cart":
+        return <Cart />;
+      case "orders":
+        return <Orders />;
+      case "payments":
+        return (
+          <Box sx={{ textAlign: "center", mt: 5 }}>
+            <Typography variant="h5">Payments Page</Typography>
+          </Box>
+        );
+      default:
+        return (
+          <Box sx={{ textAlign: "center", mt: 5 }}>
+            <Typography variant="h5">Welcome, {role.toUpperCase()}!</Typography>
+            <Typography color="text.secondary">
+              Select a section from the sidebar to get started.
+            </Typography>
+          </Box>
+        );
+    }
+  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -201,6 +295,7 @@ export default function Dashboard() {
           component="nav"
           sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
         >
+          {/* Mobile Drawer */}
           <Drawer
             variant="temporary"
             open={mobileOpen}
@@ -214,6 +309,7 @@ export default function Dashboard() {
             {drawer}
           </Drawer>
 
+          {/* Permanent Drawer */}
           <Drawer
             variant="permanent"
             sx={{
@@ -233,16 +329,7 @@ export default function Dashboard() {
         {/* Main Content */}
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
           <Toolbar />
-
-          {activeNav === "dashboard" && <></>}
-
-          {activeNav === "products" && <Products />}
-          {activeNav === "suppliers" && <Suppliers />}
-          {activeNav === "users" && <Users />}
-          {activeNav === "reports" && <Reports />}
-          {activeNav === "roles" && <Roles />}
-          {activeNav === "cart" && <Cart />}
-          {activeNav === "orders" && <Orders />}
+          {renderPage()}
         </Box>
       </Box>
     </ThemeProvider>
