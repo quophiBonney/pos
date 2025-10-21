@@ -1,22 +1,6 @@
 import Product from "../models/product.model.js";
-import cloudinary from "../config/cloudinary.js";
-import multer from "multer";
 import xlsx from "xlsx";
 import fs from "fs";
-
-const upload = multer({ dest: "uploads/" });
-export const uploadProductFile = upload.single("file");
-/**
- * Helper - upload buffer to Cloudinary
- */
-const uploadBufferToCloudinary = async (buffer, mimetype) => {
-  const base64 = buffer.toString("base64");
-  const dataURI = `data:${mimetype};base64,${base64}`;
-  return cloudinary.uploader.upload(dataURI, {
-    folder: "pos_products",
-    resource_type: "image",
-  });
-};
 
 /**
  * GET /api/products
@@ -70,9 +54,11 @@ export const getProductById = async (req, res) => {
       .json({ message: "Failed to fetch product", error: err.message });
   }
 };
-export const createProduct = async (req, res) => {
-  let uploaded = null;
 
+/**
+ * POST /api/products
+ */
+export const createProduct = async (req, res) => {
   try {
     let productsData = req.body;
 
@@ -186,13 +172,6 @@ export const createProduct = async (req, res) => {
       return res.status(409).json({ message: "SKU or barcode already exists" });
     }
 
-    if (req.file) {
-      uploaded = await uploadBufferToCloudinary(
-        req.file.buffer,
-        req.file.mimetype
-      );
-    }
-
     const product = new Product({
       name: name.trim(),
       sku: sku.trim(),
@@ -205,8 +184,6 @@ export const createProduct = async (req, res) => {
       stock: Number(stock),
       reorderLevel: Number(reorderLevel),
       status,
-      productImage: uploaded?.secure_url || "",
-      productImageId: uploaded?.public_id || "",
     });
 
     await product.save();
@@ -215,24 +192,17 @@ export const createProduct = async (req, res) => {
       .status(201)
       .json({ message: "Product created successfully", data: populated });
   } catch (err) {
-    if (uploaded?.public_id) {
-      try {
-        await cloudinary.uploader.destroy(uploaded.public_id, {
-          resource_type: "image",
-        });
-      } catch (cleanupErr) {
-        console.error("Failed to cleanup uploaded image on error:", cleanupErr);
-      }
-    }
-
     console.error("createProduct error:", err);
     return res
       .status(500)
       .json({ message: "Failed to create product(s)", error: err.message });
   }
 };
+
+/**
+ * PUT /api/products/:id
+ */
 export const updateProduct = async (req, res) => {
-  let newUpload = null;
   try {
     const id = req.params.id;
     const product = await Product.findById(id);
@@ -247,13 +217,6 @@ export const updateProduct = async (req, res) => {
       const existsB = await Product.findOne({ barcode: req.body.barcode });
       if (existsB)
         return res.status(409).json({ message: "Barcode already in use" });
-    }
-
-    if (req.file) {
-      newUpload = await uploadBufferToCloudinary(
-        req.file.buffer,
-        req.file.mimetype
-      );
     }
 
     const updates = {};
@@ -284,41 +247,13 @@ export const updateProduct = async (req, res) => {
       }
     });
 
-    if (newUpload) {
-      updates.productImage = newUpload.secure_url;
-      updates.productImageId = newUpload.public_id;
-    }
-
     const updated = await Product.findByIdAndUpdate(id, updates, {
       new: true,
       runValidators: true,
     }).populate("supplier");
 
-    if (newUpload && product.productImageId) {
-      try {
-        await cloudinary.uploader.destroy(product.productImageId, {
-          resource_type: "image",
-        });
-      } catch (delErr) {
-        console.error("Failed to delete old Cloudinary image:", delErr);
-      }
-    }
-
     return res.json(updated);
   } catch (err) {
-    if (newUpload?.public_id) {
-      try {
-        await cloudinary.uploader.destroy(newUpload.public_id, {
-          resource_type: "image",
-        });
-      } catch (cleanupErr) {
-        console.error(
-          "Failed to cleanup newly uploaded image after error:",
-          cleanupErr
-        );
-      }
-    }
-
     console.error("updateProduct error:", err);
     return res
       .status(500)
@@ -326,20 +261,13 @@ export const updateProduct = async (req, res) => {
   }
 };
 
+/**
+ * DELETE /api/products/:id
+ */
 export const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });
-
-    if (product.productImageId) {
-      try {
-        await cloudinary.uploader.destroy(product.productImageId, {
-          resource_type: "image",
-        });
-      } catch (err) {
-        console.error("Failed to delete Cloudinary image for product:", err);
-      }
-    }
 
     await product.deleteOne();
     return res.json({ message: "Product deleted successfully" });
@@ -350,6 +278,10 @@ export const deleteProduct = async (req, res) => {
       .json({ message: "Failed to delete product", error: err.message });
   }
 };
+
+/**
+ * GET /api/products/barcode/:code
+ */
 export const getBarcode = async (req, res) => {
   try {
     const product = await Product.findOne({ sku: req.params.code });
@@ -360,6 +292,10 @@ export const getBarcode = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/**
+ * POST /api/products/import
+ */
 export const importProducts = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -387,13 +323,11 @@ export const importProducts = async (req, res) => {
         status,
       } = row;
 
-      // Skip invalid rows
       if (!name || !sku || !barcode) {
         skippedCount++;
         continue;
       }
 
-      // Check for duplicates
       const existing = await Product.findOne({
         $or: [{ sku }, { barcode }],
       });
@@ -403,7 +337,6 @@ export const importProducts = async (req, res) => {
         continue;
       }
 
-      // Save new supplier
       await Product.create({
         name,
         sku,
@@ -421,7 +354,6 @@ export const importProducts = async (req, res) => {
       addedCount++;
     }
 
-    // Delete uploaded file after processing
     fs.unlinkSync(req.file.path);
 
     res.json({
