@@ -1,13 +1,17 @@
 import Supplier from "../models/supplier.model.js";
 import multer from "multer";
 import xlsx from "xlsx";
-import fs from "fs";
 
 // -------------------- MULTER SETUP --------------------
-const upload = multer({ dest: "uploads/" });
+// Use memory storage to avoid file system writes (Vercel is read-only)
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // Middleware to handle file upload
 export const uploadSupplierFile = upload.single("file");
+
+// -------------------- CONTROLLERS --------------------
+
 // Create Supplier
 export const createSupplier = async (req, res) => {
   try {
@@ -28,11 +32,12 @@ export const createSupplier = async (req, res) => {
       contactPersonName,
       contactPersonPhone,
     });
-    await supplier.save();
 
-    res
-      .status(201)
-      .json({ message: "Supplier created successfully", supplier });
+    await supplier.save();
+    res.status(201).json({
+      message: "Supplier created successfully",
+      supplier,
+    });
   } catch (error) {
     console.error("Create Supplier Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -55,7 +60,6 @@ export const getSupplierById = async (req, res) => {
     const supplier = await Supplier.findById(req.params.id);
     if (!supplier)
       return res.status(404).json({ message: "Supplier not found" });
-
     res.json(supplier);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -90,12 +94,13 @@ export const deleteSupplier = async (req, res) => {
   }
 };
 
+// Import Suppliers from Excel (Memory-based)
 export const importSuppliers = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-    // Read uploaded file
-    const workbook = xlsx.readFile(req.file.path);
+    // Read uploaded Excel file from memory
+    const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
@@ -112,13 +117,11 @@ export const importSuppliers = async (req, res) => {
         contactPersonPhone,
       } = row;
 
-      // Skip invalid rows
       if (!name || !email || !phone) {
         skippedCount++;
         continue;
       }
 
-      // Check for duplicates
       const existing = await Supplier.findOne({
         $or: [{ email }, { phone }],
       });
@@ -128,7 +131,6 @@ export const importSuppliers = async (req, res) => {
         continue;
       }
 
-      // Save new supplier
       await Supplier.create({
         name,
         email,
@@ -140,9 +142,6 @@ export const importSuppliers = async (req, res) => {
 
       addedCount++;
     }
-
-    // Delete uploaded file after processing
-    fs.unlinkSync(req.file.path);
 
     res.json({
       message: "Import completed successfully",
