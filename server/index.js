@@ -3,7 +3,6 @@ import { fileURLToPath } from "url";
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import multer from "multer";
 
 //routes imports
 import productRoutes from "./routes/product.route.js";
@@ -35,12 +34,11 @@ const corsOptions = {
 // ✅ Enable CORS globally
 app.use(cors(corsOptions));
 
-// ✅ No need for app.options("*") — Express v5 breaks on this
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// ✅ Handle multipart/form-data first
 
-const upload = multer();
-app.use(upload.none());
+// ✅ No need for app.options("*") — Express v5 breaks on this
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ✅ Connect to DB
 if (process.env.NODE_ENV !== "production") {
@@ -70,5 +68,4 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// ✅ Export for Vercel
 export default app;

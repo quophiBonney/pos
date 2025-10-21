@@ -137,7 +137,7 @@ const OrdersTable = () => {
         className="text-sm sm:text-base"
       >
         <Column
-          header="Customer"
+          header="Prepared By"
           body={userBodyTemplate}
           style={{ minWidth: "10rem", wordBreak: "break-word" }}
         />

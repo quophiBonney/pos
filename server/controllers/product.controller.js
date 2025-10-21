@@ -115,7 +115,6 @@ export const createProduct = async (req, res) => {
             .json({ message: "price and cost must be valid numbers" });
         }
 
-        // Ensure SKU/barcode uniqueness before inserting
         const existing = await Product.findOne({ $or: [{ sku }, { barcode }] });
         if (existing) {
           return res.status(409).json({
