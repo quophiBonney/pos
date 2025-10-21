@@ -36,14 +36,16 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // ✅ No need for app.options("*") — Express v5 breaks on this
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 const upload = multer();
 app.use(upload.none());
 
 // ✅ Connect to DB
-connectToDB();
+if (process.env.NODE_ENV !== "production") {
+  connectToDB();
+}
 
 // ✅ Register routes
 app.use("/api/", authRoutes);
@@ -68,4 +70,5 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
+// ✅ Export for Vercel
 export default app;
