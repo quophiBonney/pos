@@ -1,5 +1,19 @@
 import Product from "../models/product.model.js";
+import Taxes from "../models/tax.model.js";
 import xlsx from "xlsx";
+
+/**
+ * Helper: calculate price with tax
+ */
+const calculatePriceWithTax = async (category, basePrice) => {
+  const tax = await Taxes.findOne({
+    applicableCategories: { $in: [category] },
+    isActive: true,
+  });
+  if (!tax) return basePrice; // no tax found
+  const rate = Number(tax.rate) || 0;
+  return basePrice + (basePrice * rate) / 100;
+};
 
 /**
  * GET /api/products
@@ -72,14 +86,19 @@ export const createProduct = async (req, res) => {
           !p.category ||
           p.price == null ||
           p.cost == null
-        ) {
-          continue; // skip invalid ones
-        }
+        )
+          continue;
 
         const existing = await Product.findOne({
           $or: [{ sku: p.sku }, { barcode: p.barcode }],
         });
         if (!existing) {
+          const basePrice = parseFloat(p.price);
+          const priceWithTax = await calculatePriceWithTax(
+            p.category,
+            basePrice
+          );
+
           validProducts.push({
             name: p.name.trim(),
             sku: p.sku.trim(),
@@ -87,11 +106,12 @@ export const createProduct = async (req, res) => {
             description: p.description || "",
             category: p.category,
             supplier: p.supplier || undefined,
-            price: parseFloat(p.price),
+            basePrice,
+            priceWithTax,
             cost: parseFloat(p.cost),
             stock: Number(p.stock || 0),
             reorderLevel: Number(p.reorderLevel || 10),
-            status: p.status || "active",
+            status: p.status || "available",
           });
         }
       }
@@ -100,7 +120,7 @@ export const createProduct = async (req, res) => {
         ordered: false,
       });
       return res.status(201).json({
-        message: "Products created successfully",
+        message: "Products created successfully with tax applied",
         data: created,
       });
     }
@@ -113,22 +133,24 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    const existing = await Product.findOne({
-      $or: [{ sku }, { barcode }],
-    });
+    const existing = await Product.findOne({ $or: [{ sku }, { barcode }] });
     if (existing) {
       return res.status(409).json({ message: "SKU or barcode already exists" });
     }
 
+    const basePrice = parseFloat(price);
+    const priceWithTax = await calculatePriceWithTax(category, basePrice);
+
     const product = await Product.create({
       ...data,
-      price: parseFloat(price),
+      basePrice,
+      priceWithTax,
       cost: parseFloat(cost),
     });
 
     const populated = await Product.findById(product._id).populate("supplier");
     res.status(201).json({
-      message: "Product created successfully",
+      message: "Product created successfully with tax applied",
       data: populated,
     });
   } catch (err) {
@@ -146,16 +168,12 @@ export const updateProduct = async (req, res) => {
     const product = await Product.findById(id);
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    if (req.body.sku && req.body.sku !== product.sku) {
-      const exists = await Product.findOne({ sku: req.body.sku });
-      if (exists)
-        return res.status(409).json({ message: "SKU already in use" });
-    }
-
-    if (req.body.barcode && req.body.barcode !== product.barcode) {
-      const existsB = await Product.findOne({ barcode: req.body.barcode });
-      if (existsB)
-        return res.status(409).json({ message: "Barcode already in use" });
+    // Recalculate tax if price or category changes
+    if (req.body.price || req.body.category) {
+      const basePrice = parseFloat(req.body.price ?? product.basePrice);
+      const category = req.body.category ?? product.category;
+      req.body.basePrice = basePrice;
+      req.body.priceWithTax = await calculatePriceWithTax(category, basePrice);
     }
 
     const updated = await Product.findByIdAndUpdate(id, req.body, {
@@ -169,24 +187,6 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ message: "Failed to update product" });
   }
 };
-
-/**
- * DELETE /api/products/:id
- */
-export const deleteProduct = async (req, res) => {
-  try {
-    const deleted = await Product.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: "Product not found" });
-    res.json({ message: "Product deleted successfully" });
-  } catch (err) {
-    console.error("deleteProduct error:", err);
-    res.status(500).json({ message: "Failed to delete product" });
-  }
-};
-
-/**
- * GET /api/products/barcode/:code
- */
 export const getBarcode = async (req, res) => {
   try {
     const product = await Product.findOne({ sku: req.params.code });
@@ -197,11 +197,6 @@ export const getBarcode = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-/**
- * POST /api/products/import
- * Uploads via base64 or buffer instead of local path (works on Vercel)
- */
 export const importProducts = async (req, res) => {
   try {
     if (!req.file?.buffer) {
@@ -236,5 +231,15 @@ export const importProducts = async (req, res) => {
   } catch (err) {
     console.error("importProducts error:", err);
     res.status(500).json({ message: "Import failed", error: err.message });
+  }
+};
+export const deleteProduct = async (req, res) => {
+  try {
+    const deleted = await Product.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Product not found" });
+    res.json({ message: "Product deleted successfully" });
+  } catch (err) {
+    console.error("deleteProduct error:", err);
+    res.status(500).json({ message: "Failed to delete product" });
   }
 };
