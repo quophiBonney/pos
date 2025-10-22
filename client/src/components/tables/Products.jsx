@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FilterMatchMode, FilterOperator } from "primereact/api";
 import Barcode from "react-barcode";
 import { DataTable } from "primereact/datatable";
@@ -25,7 +25,10 @@ const ProductsTable = () => {
   const [productModalVisible, setProductModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const toast = useState(null);
+  const toast = useRef(null);
+
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [viewProduct, setViewProduct] = useState(null);
 
   const [statuses] = useState([
     "available",
@@ -35,7 +38,6 @@ const ProductsTable = () => {
     "discontinued",
   ]);
 
-  // ✅ Product form state
   const [newProduct, setNewProduct] = useState({
     name: "",
     category: "",
@@ -48,7 +50,6 @@ const ProductsTable = () => {
     supplier: null,
   });
 
-  // ✅ Categories
   const [categories] = useState([
     "Beverages",
     "Bakery",
@@ -72,9 +73,6 @@ const ProductsTable = () => {
     "Alcoholic Beverages",
   ]);
 
-  // =============================
-  // Fetch products and suppliers
-  // =============================
   const fetchProducts = async () => {
     try {
       const response = await api.get("/product");
@@ -103,9 +101,6 @@ const ProductsTable = () => {
     initFilters();
   }, []);
 
-  // =============================
-  // Filters & Search
-  // =============================
   const initFilters = () => {
     setFilters({
       global: { value: null, matchMode: FilterMatchMode.CONTAINS },
@@ -139,9 +134,6 @@ const ProductsTable = () => {
 
   const clearFilter = () => initFilters();
 
-  // =============================
-  // Status & Button Templates
-  // =============================
   const getSeverity = (status) => {
     switch (status?.toLowerCase()) {
       case "available":
@@ -157,8 +149,21 @@ const ProductsTable = () => {
     }
   };
 
+  const handleViewProduct = (product) => {
+    setViewProduct(product);
+    setViewModalVisible(true);
+  };
+
   const actionBodyTemplate = (rowData) => (
     <div className="flex gap-2 items-center">
+      <Button
+        label="View"
+        icon="pi pi-eye"
+        size="small"
+        outlined
+        severity="help"
+        onClick={() => handleViewProduct(rowData)}
+      />
       <Button
         label="Edit"
         icon="pi pi-pencil"
@@ -223,9 +228,6 @@ const ProductsTable = () => {
   const priceBodyTemplate = (rowData) =>
     rowData.price ? `$${rowData.price.toFixed(2)}` : "-";
 
-  // =============================
-  // Add & Edit Product
-  // =============================
   const showProductModal = () => setProductModalVisible(true);
   const hideProductModal = () => {
     setProductModalVisible(false);
@@ -277,9 +279,6 @@ const ProductsTable = () => {
     }
   };
 
-  // =============================
-  // Edit Product
-  // =============================
   const handleEditProduct = (product) => {
     setEditMode(true);
     setSelectedProduct(product);
@@ -297,9 +296,6 @@ const ProductsTable = () => {
     setProductModalVisible(true);
   };
 
-  // =============================
-  // Delete Product
-  // =============================
   const confirmDelete = (id) => {
     confirmDialog({
       message: "Are you sure you want to delete this product?",
@@ -315,7 +311,6 @@ const ProductsTable = () => {
       await api.delete(`/product/${id}`);
       fetchProducts();
 
-      // ✅ Show success toast
       toast.current.show({
         severity: "success",
         summary: "Deleted",
@@ -324,8 +319,6 @@ const ProductsTable = () => {
       });
     } catch (error) {
       console.error("Error deleting product:", error);
-
-      // ❌ Show error toast
       toast.current.show({
         severity: "error",
         summary: "Error",
@@ -335,14 +328,12 @@ const ProductsTable = () => {
     }
   };
 
-  const fileInputRef = React.useRef(null);
+  const fileInputRef = useRef(null);
 
-  // 🔹 Open file selector when user clicks button
   const handleFileButtonClick = () => {
     fileInputRef.current.click();
   };
 
-  // 🔹 Handle file import (unchanged)
   const handleImportSuppliers = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -370,12 +361,10 @@ const ProductsTable = () => {
         life: 3000,
       });
     } finally {
-      // Reset the file input so same file can be uploaded again if needed
       event.target.value = null;
     }
   };
 
-  //sku body template
   const skuBodyTemplate = (rowData) => {
     const handlePrint = () => {
       const printWindow = window.open("", "_blank", "width=400,height=300");
@@ -396,8 +385,8 @@ const ProductsTable = () => {
             JsBarcode("#barcode", "${rowData.sku}", {
               format: "CODE128",
               lineColor: "#000",
-              width: 5,          // ✅ optimal width for scanners
-              height: 60,        // ✅ good height for readability
+              width: 5,
+              height: 60,
               displayValue: true,
               fontSize: 20,
               margin: 10
@@ -413,14 +402,6 @@ const ProductsTable = () => {
 
     return (
       <div className="flex flex-col items-center">
-        {/* <Barcode
-          value={rowData.sku}
-          width={2} // ✅ narrower bars for proper scaling
-          height={40} // ✅ balanced for table
-          displayValue={false}
-          background="transparent"
-          margin={2}
-        /> */}
         <small
           className="text-blue-600 font-bold hover:underline cursor-pointer mt-1"
           onClick={handlePrint}
@@ -431,9 +412,6 @@ const ProductsTable = () => {
     );
   };
 
-  // =============================
-  // Table Header
-  // =============================
   const header = (
     <div className="flex justify-between align-items-center">
       <div className="flex gap-2">
@@ -480,9 +458,6 @@ const ProductsTable = () => {
     </div>
   );
 
-  // =============================
-  // Render
-  // =============================
   return (
     <div className="card shadow rounded-lg">
       <Toast ref={toast} />
@@ -672,6 +647,77 @@ const ProductsTable = () => {
           </div>
         </form>
       </Dialog>
+
+      {/* ✅ View Product Modal */}
+      <div className="px-5">
+        <Dialog
+          header="Product Details"
+          visible={viewModalVisible}
+          style={{ width: "40rem" }}
+          modal
+          onHide={() => setViewModalVisible(false)}
+        >
+          {viewProduct && (
+            <div className="space-y-4">
+              {viewProduct.productImage ? (
+                <img
+                  src={
+                    typeof viewProduct.productImage === "string"
+                      ? viewProduct.productImage
+                      : URL.createObjectURL(viewProduct.productImage)
+                  }
+                  alt={viewProduct.name}
+                  className="w-40 h-40 object-cover rounded-lg shadow mb-3"
+                />
+              ) : (
+                <div className="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg text-gray-500">
+                  No Image
+                </div>
+              )}
+              <div className="flex flex-col items-center">
+                <h3 className="text-xl font-bold">
+                  Product Name:{viewProduct.name}
+                </h3>
+                <p className="text-gray-600">
+                  Category: {viewProduct.category}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <p>
+                  <strong>SKU:</strong> {viewProduct.sku}
+                </p>
+                <p>
+                  <strong>Price:</strong> GHS {viewProduct.price?.toFixed(2)}
+                </p>
+                <p>
+                  <strong>Cost:</strong> GHS {viewProduct.cost?.toFixed(2)}
+                </p>
+                <p>
+                  <strong>Stock:</strong> {viewProduct.stock}
+                </p>
+                <p>
+                  <strong>Status:</strong>{" "}
+                  <Tag
+                    value={viewProduct.status}
+                    severity={getSeverity(viewProduct.status)}
+                  />
+                </p>
+                <p>
+                  <strong>Supplier:</strong>{" "}
+                  {viewProduct.supplier?.name || "N/A"}
+                </p>
+                <p>
+                  <strong>Created At:</strong>{" "}
+                  {viewProduct.createdAt
+                    ? new Date(viewProduct.createdAt).toLocaleString()
+                    : "N/A"}
+                </p>
+              </div>
+            </div>
+          )}
+        </Dialog>
+      </div>
     </div>
   );
 };

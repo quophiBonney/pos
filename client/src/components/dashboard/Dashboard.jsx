@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   CssBaseline,
@@ -44,7 +45,7 @@ import Orders from "../../pages/Orders";
 
 const drawerWidth = 260;
 
-// Theme setup
+// ✅ MUI Theme
 const theme = createTheme({
   palette: {
     primary: { main: "#1976d2" },
@@ -124,26 +125,34 @@ const navItems = [
 export default function Dashboard() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("dashboard");
+  const navigate = useNavigate();
 
-  // ✅ Get role from localStorage
+  // ✅ Get user role from localStorage
   const storedUser = JSON.parse(localStorage.getItem("user"));
   const role = storedUser?.role?.toLowerCase() || "cashier";
 
-  // ✅ Define role checks
+  // ✅ Role flags
   const isSuperAdmin = role === "super admin";
   const isAdmin = role === "admin";
   const isManager = role === "manager";
   const isCashier = role === "cashier";
   const isAccountant = role === "accountant";
 
-  // ✅ Filter menu items
+  // ✅ Filter menu items based on role
   const accessibleNavItems = isSuperAdmin
-    ? navItems // super admin sees all
+    ? navItems
     : navItems.filter((item) => item.roles.includes(role));
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
-  // Sidebar content
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    sessionStorage.clear();
+    navigate("/auth/login", { replace: true });
+  };
+
+  // ✅ Sidebar content
   const drawer = (
     <Box
       sx={{ p: 2, height: "100%", display: "flex", flexDirection: "column" }}
@@ -167,13 +176,16 @@ export default function Dashboard() {
 
       <Divider sx={{ mb: 2 }} />
 
-      {/* Sidebar menu items */}
+      {/* Sidebar Navigation */}
       <List sx={{ flexGrow: 1 }}>
         {accessibleNavItems.map((item) => (
           <ListItem key={item.id} disablePadding>
             <ListItemButton
               selected={activeNav === item.id}
-              onClick={() => setActiveNav(item.id)}
+              onClick={() => {
+                setActiveNav(item.id);
+                if (mobileOpen) setMobileOpen(false);
+              }}
               sx={{
                 borderRadius: 2,
                 mb: 0.5,
@@ -193,19 +205,14 @@ export default function Dashboard() {
         ))}
       </List>
 
-      {/* ✅ Show "Add Product" button only for Admin, Manager, Super Admin */}
-      {(isAdmin || isManager || isSuperAdmin) && (
-        <>
-          <Divider sx={{ mt: 2, mb: 1 }} />
-          <Button variant="contained" fullWidth>
-            + New Product
-          </Button>
-        </>
-      )}
+      <Divider sx={{ mt: 2, mb: 1 }} />
+      <Button variant="contained" onClick={handleLogout} fullWidth>
+        Logout
+      </Button>
     </Box>
   );
 
-  // ✅ Render correct page
+  // ✅ Render page based on activeNav
   const renderPage = () => {
     switch (activeNav) {
       case "products":
@@ -251,7 +258,7 @@ export default function Dashboard() {
       >
         <CssBaseline />
 
-        {/* Top AppBar */}
+        {/* ✅ Top AppBar */}
         <AppBar
           position="fixed"
           elevation={0}
@@ -259,12 +266,14 @@ export default function Dashboard() {
             bgcolor: "white",
             borderBottom: "1px solid #e2e8f0",
             padding: "10px",
-            width: { sm: `calc(100% - ${drawerWidth}px)` },
-            ml: { sm: `${drawerWidth}px` },
+            // ✅ Fix: only apply left margin and width reduction on large screens
+            width: { sm: `calc(100% - ${drawerWidth}px)`, xs: "100%" },
+            ml: { sm: `${drawerWidth}px`, xs: 0 },
             color: "text.primary",
           }}
         >
           <Toolbar>
+            {/* ✅ This now appears correctly on mobile */}
             <IconButton
               color="inherit"
               edge="start"
@@ -290,26 +299,34 @@ export default function Dashboard() {
           </Toolbar>
         </AppBar>
 
-        {/* Sidebar Drawer */}
+        {/* ✅ Sidebar Drawer */}
         <Box
           component="nav"
           sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
         >
           {/* Mobile Drawer */}
-          <Drawer
-            variant="temporary"
-            open={mobileOpen}
-            onClose={handleDrawerToggle}
-            ModalProps={{ keepMounted: true }}
-            sx={{
-              display: { xs: "block", sm: "none" },
-              "& .MuiDrawer-paper": { width: drawerWidth },
-            }}
+          <Box
+            component="nav"
+            sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
           >
-            {drawer}
-          </Drawer>
+            <Drawer
+              variant="temporary"
+              open={mobileOpen}
+              onClose={handleDrawerToggle}
+              ModalProps={{ keepMounted: true }}
+              sx={{
+                display: { xs: "block", sm: "none" },
+                "& .MuiDrawer-paper": {
+                  width: drawerWidth,
+                  boxSizing: "border-box",
+                },
+              }}
+            >
+              {drawer}
+            </Drawer>
+          </Box>
 
-          {/* Permanent Drawer */}
+          {/* Permanent Drawer (Desktop) */}
           <Drawer
             variant="permanent"
             sx={{
@@ -326,7 +343,7 @@ export default function Dashboard() {
           </Drawer>
         </Box>
 
-        {/* Main Content */}
+        {/* ✅ Main Content */}
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
           <Toolbar />
           {renderPage()}

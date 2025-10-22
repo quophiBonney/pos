@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Toast } from "primereact/toast";
 import api from "../../utils/api";
 
 const LoginForm = () => {
@@ -7,9 +8,9 @@ const LoginForm = () => {
     email: "",
     password: "",
   });
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const toast = useRef(null);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({
@@ -20,17 +21,35 @@ const LoginForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorMsg("");
     setLoading(true);
 
     try {
       const response = await api.post("/login", formData);
       console.log("✅ Login successful:", response.data);
+
+      // Save user data in localStorage
       localStorage.setItem("user", JSON.stringify(response.data.user));
-      navigate("/admin/dashboard");
+
+      // ✅ Show success toast
+      toast.current.show({
+        severity: "success",
+        summary: "Login Successful",
+        detail: "Redirecting to dashboard...",
+        life: 2000,
+      });
+
+      // Redirect after short delay (so user sees the toast)
+      setTimeout(() => {
+        navigate("/admin/dashboard");
+      }, 2000);
     } catch (error) {
       console.error("❌ Login failed:", error.response?.data || error.message);
-      setErrorMsg(error.response?.data?.message || "Login failed");
+      toast.current.show({
+        severity: "error",
+        summary: "Login Failed",
+        detail: error.response?.data?.message || "Invalid credentials",
+        life: 3000,
+      });
     } finally {
       setLoading(false);
     }
@@ -38,6 +57,9 @@ const LoginForm = () => {
 
   return (
     <div className="h-screen grid grid-cols-1 lg:grid-cols-2">
+      {/* PrimeReact Toast */}
+      <Toast ref={toast} />
+
       {/* Image section */}
       <div>
         <img
@@ -67,7 +89,6 @@ const LoginForm = () => {
               value={formData.email}
               onChange={handleChange}
               className="w-full p-3 xl:p-4 bg-gray-100 border-2 border-gray-200 rounded"
-              required
             />
           </div>
 
@@ -81,11 +102,8 @@ const LoginForm = () => {
               value={formData.password}
               onChange={handleChange}
               className="w-full p-3 xl:p-4 bg-gray-100 border-2 border-gray-200 rounded"
-              required
             />
           </div>
-
-          {errorMsg && <p className="text-red-500 text-sm mb-4">{errorMsg}</p>}
 
           <button
             type="submit"
