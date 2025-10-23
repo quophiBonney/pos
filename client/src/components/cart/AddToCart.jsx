@@ -194,15 +194,12 @@ const AddToCart = () => {
 
       const orderData = {
         paymentMethod,
-        totalAmount,
         transactionRef: response.reference,
         status: "paid",
         items: itemsForInvoice.map((i) => ({
           productId: i.productId,
-          name: i.name,
           price: i.price,
           quantity: i.quantity,
-          subtotal: i.subtotal,
         })),
         createdAt: new Date(),
       };

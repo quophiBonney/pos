@@ -199,35 +199,100 @@ export const getBarcode = async (req, res) => {
 };
 export const importProducts = async (req, res) => {
   try {
-    if (!req.file?.buffer) {
+    if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
+    // read excel file using multer's buffer
     const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = xlsx.utils.sheet_to_json(sheet);
+    const rows = xlsx.utils.sheet_to_json(sheet);
+
+    if (!rows.length) {
+      return res.status(400).json({ message: "Excel file is empty" });
+    }
 
     let added = 0;
     let skipped = 0;
+    const validProducts = [];
+    const errors = [];
 
-    for (const row of data) {
-      const { name, sku, barcode } = row;
-      if (!name || !sku || !barcode) {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const { name, sku, barcode, category, basePrice, cost } = row;
+
+      // validate required fields
+      if (!name || !sku || !category || basePrice == null || cost == null) {
         skipped++;
+        errors.push(
+          `Row ${
+            i + 2
+          }: Missing required fields (name, sku, category, basePrice, cost)`
+        );
         continue;
       }
 
-      const existing = await Product.findOne({ $or: [{ sku }, { barcode }] });
+      const skuStr = String(sku).trim();
+      const barcodeStr = barcode ? String(barcode).trim() : undefined;
+
+      const existing = await Product.findOne({
+        $or: [
+          { sku: skuStr },
+          ...(barcodeStr ? [{ barcode: barcodeStr }] : []),
+        ],
+      });
       if (existing) {
         skipped++;
+        errors.push(`Row ${i + 2}: SKU or barcode already exists`);
         continue;
       }
 
-      await Product.create(row);
-      added++;
+      const basePriceNum = parseFloat(basePrice);
+      if (isNaN(basePriceNum)) {
+        skipped++;
+        errors.push(`Row ${i + 2}: Invalid basePrice value`);
+        continue;
+      }
+
+      const costNum = parseFloat(cost);
+      if (isNaN(costNum)) {
+        skipped++;
+        errors.push(`Row ${i + 2}: Invalid cost value`);
+        continue;
+      }
+
+      const priceWithTax = await calculatePriceWithTax(category, basePriceNum);
+
+      validProducts.push({
+        name: String(name).trim(),
+        sku: skuStr,
+        barcode: barcodeStr,
+        description: row.description ? String(row.description).trim() : "",
+        category: String(category).trim(),
+        supplier: row.supplier ? String(row.supplier).trim() : undefined,
+        basePrice: basePriceNum,
+        priceWithTax,
+        cost: costNum,
+        stock: Number(row.stock || 0),
+        reorderLevel: Number(row.reorderLevel || 10),
+        status: row.status ? String(row.status).trim() : "available",
+      });
     }
 
-    res.json({ message: "Import completed", added, skipped });
+    if (validProducts.length > 0) {
+      await Product.insertMany(validProducts, { ordered: false });
+      added = validProducts.length;
+    }
+
+    res.json({
+      message:
+        added > 0
+          ? "Import completed successfully with tax applied"
+          : "No products were imported",
+      added,
+      skipped,
+      errors,
+    });
   } catch (err) {
     console.error("importProducts error:", err);
     res.status(500).json({ message: "Import failed", error: err.message });

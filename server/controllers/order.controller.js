@@ -13,7 +13,7 @@ export const createOrder = async (req, res) => {
     const orderItems = items.map((item) => ({
       product: item.productId, // ✅ matches schema
       quantity: item.quantity,
-      price: item.price, // snapshot at purchase
+      price: item.price || item.basePrice, // snapshot at purchase
     }));
 
     // 🧮 Calculate totals

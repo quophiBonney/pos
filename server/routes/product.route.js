@@ -13,8 +13,7 @@ import {
 } from "../controllers/product.controller.js";
 
 const router = express.Router();
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/product", getProducts);
 

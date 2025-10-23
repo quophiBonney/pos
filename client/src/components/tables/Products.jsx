@@ -43,7 +43,7 @@ const ProductsTable = () => {
     category: "",
     sku: "",
     productImage: "",
-    price: null,
+    basePrice: null,
     stock: null,
     cost: null,
     status: "",
@@ -226,7 +226,7 @@ const ProductsTable = () => {
   );
 
   const priceBodyTemplate = (rowData) =>
-    rowData.price ? `$${rowData.price.toFixed(2)}` : "-";
+    rowData.basePrice ? `GHS ${rowData.basePrice.toFixed(2)}` : "-";
 
   const showProductModal = () => setProductModalVisible(true);
   const hideProductModal = () => {
@@ -238,7 +238,7 @@ const ProductsTable = () => {
       category: "",
       sku: "",
       productImage: "",
-      price: null,
+      basePrice: null,
       stock: null,
       cost: null,
       status: "",
@@ -287,7 +287,7 @@ const ProductsTable = () => {
       category: product.category,
       sku: product.sku,
       productImage: product.productImage,
-      price: product.price,
+      price: product.basePrice,
       stock: product.stock,
       cost: product.cost,
       status: product.status,
@@ -342,22 +342,38 @@ const ProductsTable = () => {
     formData.append("file", file);
 
     try {
-      await api.post("/product/import", formData, {
+      const response = await api.post("/product/import", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      toast.current.show({
-        severity: "success",
-        summary: "Imported",
-        detail: "Products imported successfully",
-        life: 3000,
-      });
+      const { added, skipped, errors } = response.data;
+
+      if (added > 0) {
+        toast.current.show({
+          severity: "success",
+          summary: "Imported",
+          detail: `${added} products imported successfully${
+            skipped > 0 ? `, ${skipped} skipped` : ""
+          }`,
+          life: 3000,
+        });
+      } else {
+        toast.current.show({
+          severity: "error",
+          summary: "Import Failed",
+          detail:
+            errors?.length > 0
+              ? errors.join("; ")
+              : "No products were imported",
+          life: 5000,
+        });
+      }
       fetchProducts();
     } catch (error) {
       console.error("Error importing products:", error);
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: "Failed to import products",
+        detail: error.response?.data?.message || "Failed to import products",
         life: 3000,
       });
     } finally {
@@ -478,7 +494,12 @@ const ProductsTable = () => {
       >
         <Column field="name" header="Name" sortable filter />
         <Column field="category" header="Category" filter />
-        <Column field="price" header="Price" body={priceBodyTemplate} />
+        <Column
+          field="price"
+          header="Price"
+          style={{ width: "12%" }}
+          body={priceBodyTemplate}
+        />
         <Column field="stock" header="Quantity" sortable />
         <Column field="cost" header="Cost" sortable />
         <Column
@@ -653,12 +674,13 @@ const ProductsTable = () => {
         <Dialog
           header="Product Details"
           visible={viewModalVisible}
-          style={{ width: "40rem" }}
+          style={{ width: "50rem" }}
           modal
           onHide={() => setViewModalVisible(false)}
         >
           {viewProduct && (
             <div className="space-y-4">
+              {/* Product Image */}
               {viewProduct.productImage ? (
                 <img
                   src={
@@ -667,52 +689,116 @@ const ProductsTable = () => {
                       : URL.createObjectURL(viewProduct.productImage)
                   }
                   alt={viewProduct.name}
-                  className="w-40 h-40 object-cover rounded-lg shadow mb-3"
+                  className="w-40 h-40 object-cover rounded-lg shadow mb-3 mx-auto"
                 />
               ) : (
-                <div className="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg text-gray-500">
+                <div className="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg text-gray-500 mx-auto">
                   No Image
                 </div>
               )}
-              <div className="flex flex-col items-center">
-                <h3 className="text-xl font-bold">
-                  Product Name:{viewProduct.name}
-                </h3>
-                <p className="text-gray-600">
-                  Category: {viewProduct.category}
-                </p>
+
+              {/* Product Details Table */}
+              <div className="mt-6">
+                <h4 className="text-lg font-semibold mb-2 text-gray-700 text-center">
+                  Product Information
+                </h4>
+                <table className="w-full border border-gray-200">
+                  <tbody>
+                    <tr>
+                      <td className="p-2 border-b font-semibold w-1/2">
+                        Product Name
+                      </td>
+                      <td className="p-2 border-b">{viewProduct.name}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-semibold">Category</td>
+                      <td className="p-2 border-b">{viewProduct.category}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-semibold">SKU</td>
+                      <td className="p-2 border-b">{viewProduct.sku}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-semibold">Price</td>
+                      <td className="p-2 border-b text-right">
+                        GHS {viewProduct.basePrice?.toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-semibold">Cost</td>
+                      <td className="p-2 border-b text-right">
+                        GHS {viewProduct.cost?.toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-semibold">Stock</td>
+                      <td className="p-2 border-b">{viewProduct.stock}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-semibold">Status</td>
+                      <td className="p-2 border-b">
+                        <Tag
+                          value={viewProduct.status}
+                          severity={getSeverity(viewProduct.status)}
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-semibold">Supplier</td>
+                      <td className="p-2 border-b">
+                        {viewProduct.supplier?.name || "N/A"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-semibold">Created At</td>
+                      <td className="p-2 border-b">
+                        {viewProduct.createdAt
+                          ? new Date(viewProduct.createdAt).toLocaleString()
+                          : "N/A"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <p>
-                  <strong>SKU:</strong> {viewProduct.sku}
-                </p>
-                <p>
-                  <strong>Price:</strong> GHS {viewProduct.price?.toFixed(2)}
-                </p>
-                <p>
-                  <strong>Cost:</strong> GHS {viewProduct.cost?.toFixed(2)}
-                </p>
-                <p>
-                  <strong>Stock:</strong> {viewProduct.stock}
-                </p>
-                <p>
-                  <strong>Status:</strong>{" "}
-                  <Tag
-                    value={viewProduct.status}
-                    severity={getSeverity(viewProduct.status)}
-                  />
-                </p>
-                <p>
-                  <strong>Supplier:</strong>{" "}
-                  {viewProduct.supplier?.name || "N/A"}
-                </p>
-                <p>
-                  <strong>Created At:</strong>{" "}
-                  {viewProduct.createdAt
-                    ? new Date(viewProduct.createdAt).toLocaleString()
-                    : "N/A"}
-                </p>
+              {/* Sales Summary Table */}
+              <div className="mt-6">
+                <h4 className="text-lg font-semibold mb-2 text-gray-700 text-center">
+                  Sales Summary
+                </h4>
+                <table className="w-full border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-100 text-left">
+                      <th className="p-2 border-b">Description</th>
+                      <th className="p-2 border-b text-right">Amount (GHS)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="p-2 border-b">
+                        Total Revenue (if sold out)
+                      </td>
+                      <td className="p-2 border-b text-right">
+                        {(viewProduct.basePrice * viewProduct.stock).toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Total Cost</td>
+                      <td className="p-2 border-b text-right">
+                        {(viewProduct.cost * viewProduct.stock).toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr className="bg-gray-50 font-semibold">
+                      <td className="p-2">Expected Profit</td>
+                      <td className="p-2 text-right">
+                        {(
+                          viewProduct.basePrice * viewProduct.stock -
+                          viewProduct.cost * viewProduct.stock
+                        ).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
