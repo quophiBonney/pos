@@ -84,7 +84,7 @@ const OrdersTable = () => {
   // ✅ Format templates
   const itemsBodyTemplate = (rowData) =>
     rowData.items
-      .map((item) => `${item.product?.name || "Unknown"} (x${item.quantity})`)
+      .map((item) => `${item.name || "Unknown"} (x${item.quantity})`)
       .join(", ");
 
   const userBodyTemplate = (rowData) =>

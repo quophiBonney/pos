@@ -74,3 +74,105 @@ export const getOrders = async (req, res) => {
       .json({ message: "Error fetching orders", error: error.message });
   }
 };
+
+// ✅ New: Get dashboard statistics
+export const getDashboardStats = async (req, res) => {
+  try {
+    // Total products
+    const totalProducts = await Product.countDocuments();
+
+    // Total users
+    const User = (await import("../models/user.model.js")).default;
+    const totalUsers = await User.countDocuments();
+
+    // Total sales (orders)
+    const totalOrders = await Order.countDocuments();
+
+    // Total revenue
+    const revenueResult = await Order.aggregate([
+      { $match: { status: "paid" } },
+      { $group: { _id: null, total: { $sum: "$total" } } },
+    ]);
+    const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
+
+    res.json({
+      totalProducts,
+      totalUsers,
+      totalOrders,
+      totalRevenue,
+    });
+  } catch (error) {
+    console.error("Dashboard Stats Error:", error);
+    res.status(500).json({
+      message: "Failed to fetch dashboard stats",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ New: Get sales data for charts
+export const getSalesData = async (req, res) => {
+  try {
+    const { period = "daily" } = req.query; // daily, weekly, monthly, yearly
+
+    let groupBy;
+    let dateFormat;
+
+    switch (period) {
+      case "daily":
+        groupBy = {
+          $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+        };
+        dateFormat = "%Y-%m-%d";
+        break;
+      case "weekly":
+        groupBy = {
+          $dateToString: { format: "%Y-%U", date: "$createdAt" },
+        };
+        dateFormat = "%Y-%U";
+        break;
+      case "monthly":
+        groupBy = {
+          $dateToString: { format: "%Y-%m", date: "$createdAt" },
+        };
+        dateFormat = "%Y-%m";
+        break;
+      case "yearly":
+        groupBy = {
+          $dateToString: { format: "%Y", date: "$createdAt" },
+        };
+        dateFormat = "%Y";
+        break;
+      default:
+        groupBy = {
+          $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+        };
+        dateFormat = "%Y-%m-%d";
+    }
+
+    const salesData = await Order.aggregate([
+      { $match: { status: "paid" } },
+      {
+        $group: {
+          _id: groupBy,
+          totalSales: { $sum: "$total" },
+          orderCount: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
+    res.json({
+      period,
+      data: salesData,
+    });
+  } catch (error) {
+    console.error("Sales Data Error:", error);
+    res.status(500).json({
+      message: "Failed to fetch sales data",
+      error: error.message,
+    });
+  }
+};

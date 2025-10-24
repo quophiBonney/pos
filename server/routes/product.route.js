@@ -10,6 +10,8 @@ import {
   deleteProduct,
   getBarcode,
   importProducts,
+  receiveStock,
+  getStockHistory,
 } from "../controllers/product.controller.js";
 
 const router = express.Router();
@@ -23,4 +25,6 @@ router.delete("/product/:id", deleteProduct);
 router.get("/product/barcode/:code", getBarcode);
 // router.post("/product/import", importProducts);
 router.post("/product/import", upload.single("file"), importProducts);
+router.post("/product/:id/receive-stock", receiveStock);
+router.get("/product/:id/stock-history", getStockHistory);
 export default router;

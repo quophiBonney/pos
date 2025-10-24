@@ -17,6 +17,7 @@ import {
   Divider,
   Badge,
   Avatar,
+  Collapse,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -31,6 +32,8 @@ import {
   Group,
   ReceiptLong,
   Payment,
+  ExpandLess,
+  ExpandMore,
 } from "@mui/icons-material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 
@@ -42,6 +45,8 @@ import Reports from "../../pages/Reports";
 import Roles from "../../pages/Roles";
 import Cart from "../../pages/Cart";
 import Orders from "../../pages/Orders";
+import SalesOverview from "../chart/SalesOverview";
+import CategoriesTable from "../tables/Categories";
 
 const drawerWidth = 260;
 
@@ -58,7 +63,7 @@ const theme = createTheme({
   },
 });
 
-// ✅ Navigation items with role-based access
+// ✅ Navigation items with role-based access and submenus
 const navItems = [
   {
     id: "dashboard",
@@ -67,28 +72,50 @@ const navItems = [
     roles: ["super admin", "admin", "manager", "cashier", "accountant"],
   },
   {
+    id: "inventory",
+    label: "Inventory",
+    icon: <Inventory2 />,
+    roles: ["super admin", "admin", "manager", "cashier"],
+    submenu: [
+      {
+        id: "products",
+        label: "Products",
+        roles: ["super admin", "admin", "manager", "cashier"],
+      },
+      {
+        id: "suppliers",
+        label: "Suppliers",
+        roles: ["super admin", "admin", "manager"],
+      },
+      {
+        id: "categories",
+        label: "Categories",
+        roles: ["super admin", "admin", "manager"],
+      },
+    ],
+  },
+  {
     id: "sales",
     label: "Sales",
     icon: <BarChartIcon />,
     roles: ["super admin", "admin", "manager"],
-  },
-  {
-    id: "products",
-    label: "Products",
-    icon: <Inventory2 />,
-    roles: ["super admin", "admin", "manager", "cashier"],
-  },
-  {
-    id: "suppliers",
-    label: "Suppliers",
-    icon: <PeopleIcon />,
-    roles: ["super admin", "admin", "manager"],
-  },
-  {
-    id: "cart",
-    label: "Cart",
-    icon: <ShoppingCartIcon />,
-    roles: ["super admin", "cashier", "admin"],
+    submenu: [
+      {
+        id: "sales",
+        label: "Sales Overview",
+        roles: ["super admin", "admin", "manager"],
+      },
+      {
+        id: "cart",
+        label: "Cart",
+        roles: ["super admin", "cashier", "admin"],
+      },
+      {
+        id: "orders",
+        label: "Orders",
+        roles: ["super admin", "admin", "manager", "cashier"],
+      },
+    ],
   },
   {
     id: "users",
@@ -101,12 +128,6 @@ const navItems = [
     label: "Reports",
     icon: <ReceiptLong />,
     roles: ["super admin", "admin", "manager", "accountant"],
-  },
-  {
-    id: "orders",
-    label: "Orders",
-    icon: <AssignmentTurnedIn />,
-    roles: ["super admin", "admin", "manager", "cashier"],
   },
   {
     id: "payments",
@@ -125,6 +146,7 @@ const navItems = [
 export default function Dashboard() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("dashboard");
+  const [openMenus, setOpenMenus] = useState({});
   const navigate = useNavigate();
 
   // ✅ Get user role from localStorage
@@ -142,6 +164,14 @@ export default function Dashboard() {
   const accessibleNavItems = isSuperAdmin
     ? navItems
     : navItems.filter((item) => item.roles.includes(role));
+
+  // ✅ Handle submenu toggle
+  const handleMenuToggle = (menuId) => {
+    setOpenMenus((prev) => ({
+      ...prev,
+      [menuId]: !prev[menuId],
+    }));
+  };
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
@@ -179,29 +209,72 @@ export default function Dashboard() {
       {/* Sidebar Navigation */}
       <List sx={{ flexGrow: 1 }}>
         {accessibleNavItems.map((item) => (
-          <ListItem key={item.id} disablePadding>
-            <ListItemButton
-              selected={activeNav === item.id}
-              onClick={() => {
-                setActiveNav(item.id);
-                if (mobileOpen) setMobileOpen(false);
-              }}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-                transition: "0.2s",
-                "&.Mui-selected": {
-                  bgcolor: "primary.main",
-                  color: "white",
-                  "& .MuiListItemIcon-root": { color: "white" },
-                },
-                "&:hover": { bgcolor: "rgba(25,118,210,0.1)" },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          </ListItem>
+          <div key={item.id}>
+            <ListItem disablePadding>
+              <ListItemButton
+                selected={activeNav === item.id && !item.submenu}
+                onClick={() => {
+                  if (item.submenu) {
+                    handleMenuToggle(item.id);
+                  } else {
+                    setActiveNav(item.id);
+                    if (mobileOpen) setMobileOpen(false);
+                  }
+                }}
+                sx={{
+                  borderRadius: 2,
+                  mb: 0.5,
+                  transition: "0.2s",
+                  "&.Mui-selected": {
+                    bgcolor: "primary.main",
+                    color: "white",
+                    "& .MuiListItemIcon-root": { color: "white" },
+                  },
+                  "&:hover": { bgcolor: "rgba(25,118,210,0.1)" },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.label} />
+                {item.submenu &&
+                  (openMenus[item.id] ? <ExpandLess /> : <ExpandMore />)}
+              </ListItemButton>
+            </ListItem>
+            {item.submenu && (
+              <Collapse in={openMenus[item.id]} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {item.submenu
+                    .filter(
+                      (subItem) => isSuperAdmin || subItem.roles.includes(role)
+                    )
+                    .map((subItem) => (
+                      <ListItem key={subItem.id} disablePadding>
+                        <ListItemButton
+                          selected={activeNav === subItem.id}
+                          onClick={() => {
+                            setActiveNav(subItem.id);
+                            if (mobileOpen) setMobileOpen(false);
+                          }}
+                          sx={{
+                            pl: 4,
+                            borderRadius: 2,
+                            mb: 0.5,
+                            transition: "0.2s",
+                            "&.Mui-selected": {
+                              bgcolor: "primary.main",
+                              color: "white",
+                              "& .MuiListItemIcon-root": { color: "white" },
+                            },
+                            "&:hover": { bgcolor: "rgba(25,118,210,0.1)" },
+                          }}
+                        >
+                          <ListItemText primary={subItem.label} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                </List>
+              </Collapse>
+            )}
+          </div>
         ))}
       </List>
 
@@ -219,16 +292,20 @@ export default function Dashboard() {
         return <Products />;
       case "suppliers":
         return <Suppliers />;
+      case "categories":
+        return <CategoriesTable />;
+      case "sales":
+        return <SalesOverview />;
+      case "cart":
+        return <Cart />;
+      case "orders":
+        return <Orders />;
       case "users":
         return <Users />;
       case "reports":
         return <Reports />;
       case "roles":
         return <Roles />;
-      case "cart":
-        return <Cart />;
-      case "orders":
-        return <Orders />;
       case "payments":
         return (
           <Box sx={{ textAlign: "center", mt: 5 }}>

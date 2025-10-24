@@ -1,5 +1,6 @@
 import Product from "../models/product.model.js";
 import Taxes from "../models/tax.model.js";
+import StockReceipt from "../models/stockReceipt.model.js";
 import xlsx from "xlsx";
 
 /**
@@ -306,5 +307,112 @@ export const deleteProduct = async (req, res) => {
   } catch (err) {
     console.error("deleteProduct error:", err);
     res.status(500).json({ message: "Failed to delete product" });
+  }
+};
+
+/**
+ * POST /api/products/:id/receive-stock
+ */
+export const receiveStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quantityReceived, costPerUnit, supplier, receivedBy, notes } =
+      req.body;
+
+    if (!quantityReceived || !costPerUnit || !supplier || !receivedBy) {
+      return res.status(400).json({
+        message:
+          "quantityReceived, costPerUnit, supplier, and receivedBy are required",
+      });
+    }
+
+    const product = await Product.findById(id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const quantity = Number(quantityReceived);
+    const cost = Number(costPerUnit);
+    const totalCost = quantity * cost;
+
+    // Update product stock
+    product.stock += quantity;
+    await product.save();
+
+    // Create stock receipt record
+    const receipt = await StockReceipt.create({
+      product: id,
+      supplier,
+      quantityReceived: quantity,
+      costPerUnit: cost,
+      totalCost,
+      receivedBy,
+      notes: notes || "",
+    });
+
+    const populatedReceipt = await StockReceipt.findById(receipt._id)
+      .populate("product", "name sku")
+      .populate("supplier", "name")
+      .populate("receivedBy", "name email");
+
+    res.status(201).json({
+      message: "Stock received successfully",
+      data: {
+        product: {
+          _id: product._id,
+          name: product.name,
+          stock: product.stock,
+        },
+        receipt: populatedReceipt,
+      },
+    });
+  } catch (err) {
+    console.error("receiveStock error:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to receive stock", error: err.message });
+  }
+};
+
+/**
+ * GET /api/products/:id/stock-history
+ */
+export const getStockHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findById(id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const receipts = await StockReceipt.find({ product: id })
+      .populate("supplier", "name")
+      .populate("receivedBy", "name email")
+      .sort({ receivedDate: -1 });
+
+    // Calculate total received and current stock info
+    const totalReceived = receipts.reduce(
+      (sum, r) => sum + r.quantityReceived,
+      0
+    );
+    const totalCost = receipts.reduce((sum, r) => sum + r.totalCost, 0);
+    const averageCost = totalReceived > 0 ? totalCost / totalReceived : 0;
+
+    res.json({
+      product: {
+        _id: product._id,
+        name: product.name,
+        currentStock: product.stock,
+        reorderLevel: product.reorderLevel,
+      },
+      summary: {
+        totalReceived,
+        totalCost,
+        averageCost,
+        receiptsCount: receipts.length,
+      },
+      receipts,
+    });
+  } catch (err) {
+    console.error("getStockHistory error:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch stock history", error: err.message });
   }
 };

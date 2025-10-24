@@ -29,6 +29,18 @@ const ProductsTable = () => {
 
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [viewProduct, setViewProduct] = useState(null);
+  const [stockHistory, setStockHistory] = useState([]);
+  const [receiveStockModalVisible, setReceiveStockModalVisible] =
+    useState(false);
+  const [receiveStockData, setReceiveStockData] = useState({
+    quantityReceived: null,
+    costPerUnit: null,
+    supplier: null,
+    receivedBy: null,
+    notes: "",
+  });
+  const [users, setUsers] = useState([]);
+  const currentUser = JSON.parse(localStorage.getItem("user")) || {};
 
   const [statuses] = useState([
     "available",
@@ -95,9 +107,20 @@ const ProductsTable = () => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get("/user");
+      const data = response.data.data || response.data;
+      setUsers(data);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchSuppliers();
+    fetchUsers();
     initFilters();
   }, []);
 
@@ -149,8 +172,15 @@ const ProductsTable = () => {
     }
   };
 
-  const handleViewProduct = (product) => {
+  const handleViewProduct = async (product) => {
     setViewProduct(product);
+    try {
+      const response = await api.get(`/product/${product._id}/stock-history`);
+      setStockHistory(response.data.receipts || []);
+    } catch (error) {
+      console.error("Error fetching stock history:", error);
+      setStockHistory([]);
+    }
     setViewModalVisible(true);
   };
 
@@ -200,14 +230,23 @@ const ProductsTable = () => {
       }
     };
 
+    // Check for reorder alert
+    const isLowStock = rowData.stock <= rowData.reorderLevel;
+    const reorderAlert = isLowStock ? (
+      <span className="ml-2 text-xs text-red-600 font-bold">⚠️ Low Stock</span>
+    ) : null;
+
     return (
-      <span
-        className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(
-          rowData.status
-        )}`}
-      >
-        {rowData.status}
-      </span>
+      <div className="flex items-center">
+        <span
+          className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(
+            rowData.status
+          )}`}
+        >
+          {rowData.status}
+        </span>
+        {reorderAlert}
+      </div>
     );
   };
 
@@ -378,6 +417,39 @@ const ProductsTable = () => {
       });
     } finally {
       event.target.value = null;
+    }
+  };
+
+  const handleReceiveStockSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post(
+        `/product/${viewProduct._id}/receive-stock`,
+        receiveStockData
+      );
+      setReceiveStockModalVisible(false);
+      setReceiveStockData({
+        quantityReceived: null,
+        costPerUnit: null,
+        supplier: null,
+        notes: "",
+      });
+      fetchProducts();
+      handleViewProduct(viewProduct);
+      toast.current.show({
+        severity: "success",
+        summary: "Stock Received",
+        detail: "Stock received successfully",
+        life: 3000,
+      });
+    } catch (error) {
+      console.error("Error receiving stock:", error);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Failed to receive stock",
+        life: 3000,
+      });
     }
   };
 
@@ -698,7 +770,7 @@ const ProductsTable = () => {
               )}
 
               {/* Product Details Table */}
-              <div className="mt-6">
+              {/* <div className="mt-6">
                 <h4 className="text-lg font-semibold mb-2 text-gray-700 text-center">
                   Product Information
                 </h4>
@@ -759,51 +831,239 @@ const ProductsTable = () => {
                     </tr>
                   </tbody>
                 </table>
-              </div>
+              </div> */}
 
-              {/* Sales Summary Table */}
+              {/* Reorder Alert */}
+              {viewProduct.stock <= viewProduct.reorderLevel && (
+                <div className="mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                  <strong>⚠️ Low Stock Alert:</strong> Current stock (
+                  {viewProduct.stock}) is below reorder level (
+                  {viewProduct.reorderLevel}). Consider reordering.
+                </div>
+              )}
+
+              {/* Detailed Profit Calculations */}
               <div className="mt-6">
                 <h4 className="text-lg font-semibold mb-2 text-gray-700 text-center">
-                  Sales Summary
+                  Profit Analysis
                 </h4>
                 <table className="w-full border border-gray-200">
                   <thead>
                     <tr className="bg-gray-100 text-left">
-                      <th className="p-2 border-b">Description</th>
-                      <th className="p-2 border-b text-right">Amount (GHS)</th>
+                      <th className="p-2 border-b">Metric</th>
+                      <th className="p-2 border-b text-right">Value</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="p-2 border-b">
-                        Total Revenue (if sold out)
-                      </td>
+                      <td className="p-2 border-b">Stock Quantity</td>
                       <td className="p-2 border-b text-right">
-                        {(viewProduct.basePrice * viewProduct.stock).toFixed(2)}
+                        {viewProduct.stock}
                       </td>
                     </tr>
                     <tr>
-                      <td className="p-2 border-b">Total Cost</td>
+                      <td className="p-2 border-b">Selling Price per Unit</td>
                       <td className="p-2 border-b text-right">
-                        {(viewProduct.cost * viewProduct.stock).toFixed(2)}
+                        GHS {viewProduct.basePrice?.toFixed(2)}
                       </td>
                     </tr>
-                    <tr className="bg-gray-50 font-semibold">
-                      <td className="p-2">Expected Profit</td>
-                      <td className="p-2 text-right">
+                    <tr>
+                      <td className="p-2 border-b">Cost per Unit</td>
+                      <td className="p-2 border-b text-right">
+                        GHS {viewProduct.cost?.toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Profit per Unit</td>
+                      <td className="p-2 border-b text-right">
+                        GHS{" "}
+                        {(viewProduct.basePrice - viewProduct.cost)?.toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Profit Margin</td>
+                      <td className="p-2 border-b text-right">
                         {(
-                          viewProduct.basePrice * viewProduct.stock -
-                          viewProduct.cost * viewProduct.stock
-                        ).toFixed(2)}
+                          ((viewProduct.basePrice - viewProduct.cost) /
+                            viewProduct.cost) *
+                          100
+                        )?.toFixed(2)}
+                        %
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">
+                        Total Expected Profit (if sold out)
+                      </td>
+                      <td className="p-2 border-b text-right">
+                        GHS{" "}
+                        {(
+                          (viewProduct.basePrice - viewProduct.cost) *
+                          viewProduct.stock
+                        )?.toFixed(2)}
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
+
+              {/* Stock History Table */}
+              <div className="mt-6">
+                <h4 className="text-lg font-semibold mb-2 text-gray-700 text-center">
+                  Stock History
+                </h4>
+                {stockHistory.length > 0 ? (
+                  <table className="w-full border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-100 text-left">
+                        <th className="p-2 border-b">Date</th>
+                        <th className="p-2 border-b">Quantity Received</th>
+                        <th className="p-2 border-b">Cost per Unit (GHS)</th>
+                        <th className="p-2 border-b">Supplier</th>
+                        <th className="p-2 border-b">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stockHistory.map((receipt, index) => (
+                        <tr key={index}>
+                          <td className="p-2 border-b">
+                            {new Date(receipt.date).toLocaleDateString()}
+                          </td>
+                          <td className="p-2 border-b">
+                            {receipt.quantityReceived}
+                          </td>
+                          <td className="p-2 border-b">
+                            {receipt.costPerUnit?.toFixed(2)}
+                          </td>
+                          <td className="p-2 border-b">
+                            {receipt.supplier?.name || "N/A"}
+                          </td>
+                          <td className="p-2 border-b">
+                            {receipt.notes || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-gray-500 text-center">
+                    No stock history available.
+                  </p>
+                )}
+              </div>
+
+              {/* Receive Stock Button */}
+              <div className="mt-6 flex justify-center">
+                <Button
+                  label="Receive Stock"
+                  icon="pi pi-plus"
+                  onClick={() => {
+                    setReceiveStockData({
+                      quantityReceived: null,
+                      costPerUnit: null,
+                      supplier: viewProduct.supplier?._id || null,
+                      receivedBy: currentUser._id || null,
+                      notes: "",
+                    });
+                    setReceiveStockModalVisible(true);
+                  }}
+                  className="p-button-success"
+                />
+              </div>
             </div>
           )}
         </Dialog>
       </div>
+
+      {/* Receive Stock Modal */}
+      <Dialog
+        header="Receive Stock"
+        visible={receiveStockModalVisible}
+        style={{ width: "50rem" }}
+        modal
+        className="p-fluid"
+        onHide={() => setReceiveStockModalVisible(false)}
+      >
+        <form onSubmit={handleReceiveStockSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block font-medium mb-2">
+                Quantity Received
+              </label>
+              <InputNumber
+                value={receiveStockData.quantityReceived}
+                onValueChange={(e) =>
+                  setReceiveStockData((prev) => ({
+                    ...prev,
+                    quantityReceived: e.value,
+                  }))
+                }
+                required
+              />
+            </div>
+            <div>
+              <label className="block font-medium mb-2">
+                Cost per Unit (GHS)
+              </label>
+              <InputNumber
+                value={receiveStockData.costPerUnit}
+                onValueChange={(e) =>
+                  setReceiveStockData((prev) => ({
+                    ...prev,
+                    costPerUnit: e.value,
+                  }))
+                }
+                mode="currency"
+                currency="GHS"
+                locale="en-GH"
+                required
+              />
+            </div>
+            <div>
+              <label className="block font-medium mb-2">Supplier</label>
+              <Dropdown
+                value={receiveStockData.supplier}
+                options={suppliers}
+                optionLabel="name"
+                optionValue="_id"
+                placeholder="Select supplier"
+                showClear={false}
+                filter={false}
+                disabled={true}
+                required
+              />
+            </div>
+            <div>
+              <label className="block font-medium mb-2">Notes</label>
+              <InputText
+                value={receiveStockData.notes}
+                onChange={(e) =>
+                  setReceiveStockData((prev) => ({
+                    ...prev,
+                    notes: e.target.value,
+                  }))
+                }
+                placeholder="Optional notes"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              label="Cancel"
+              icon="pi pi-times"
+              outlined
+              onClick={() => setReceiveStockModalVisible(false)}
+              type="button"
+            />
+            <Button
+              label="Receive Stock"
+              icon="pi pi-check"
+              type="submit"
+              severity="success"
+            />
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 };
