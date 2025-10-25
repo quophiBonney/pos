@@ -44,9 +44,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ✅ Connect to DB
-if (process.env.NODE_ENV !== "production") {
-  connectToDB();
-}
+connectToDB();
 
 // ✅ Register routes
 app.use("/api/", authRoutes);
