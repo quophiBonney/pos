@@ -15,6 +15,8 @@ import reportRoutes from "./routes/report.route.js";
 import orderRoutes from "./routes/order.route.js";
 import taxRoutes from "./routes/tax.route.js";
 import categoryRoutes from "./routes/category.route.js";
+import purchaseOrderRoutes from "./routes/purchase.order.route.js";
+
 
 import connectToDB from "./config/db.connection.js";
 dotenv.config();
@@ -57,6 +59,7 @@ app.use("/api/", paymentRoutes);
 app.use("/api/", orderRoutes);
 app.use("/api/", taxRoutes);
 app.use("/api/", categoryRoutes);
+app.use("/api/", purchaseOrderRoutes);
 
 // ✅ Root endpoint
 app.get("/", (req, res) => {

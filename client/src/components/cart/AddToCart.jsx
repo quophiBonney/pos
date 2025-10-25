@@ -122,7 +122,7 @@ const AddToCart = () => {
 
   // totals
   const calculateCartTotal = (items) =>
-    items.reduce((s, it) => s + it.product.price * it.quantity, 0);
+    items.reduce((s, it) => s + it.product.basePrice * it.quantity, 0);
 
   const calculateCartTotalFixed = (items) =>
     calculateCartTotal(items).toFixed(2);
@@ -165,7 +165,7 @@ const AddToCart = () => {
     const handler = window.PaystackPop.setup({
       key: paystackKey,
       email: "customer@email.com",
-      amount: totalAmount * 100,
+       amount: Math.round(totalAmount * 100),
       currency: "GHS",
       ref: "PSK_" + Date.now(),
       callback: (response) => handleOrderAfterPayment(response),
@@ -184,9 +184,9 @@ const AddToCart = () => {
       const itemsForInvoice = cartItems.map((it) => ({
         productId: it.product._id,
         name: it.product.name,
-        price: it.product.price,
+        price: it.product.basePrice,
         quantity: it.quantity,
-        subtotal: it.product.price * it.quantity,
+        subtotal: it.product.basePrice * it.quantity,
         product: it.product, // keep original product for printing image / name if needed
       }));
 
@@ -322,7 +322,7 @@ const AddToCart = () => {
                 <tr>
                   <td>${escapeHtml(it.name)}</td>
                   <td>${it.quantity}</td>
-                  <td>Total = GHS ${Number(it.price).toFixed(2)}</td>
+                  <td>Total = GHS ${Number(it.basePrice).toFixed(2)}</td>
                   <td>GHS ${Number(it.subtotal).toFixed(2)}</td>
                 </tr>
               `
@@ -490,7 +490,7 @@ const AddToCart = () => {
                           {item.product?.name || "Unknown Product"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          GHS {item.product?.price?.toFixed(2) || "0.00"}
+                          GHS {item.product?.basePrice?.toFixed(2) || "0.00"}
                         </Typography>
                       </Box>
                     </Box>

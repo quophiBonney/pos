@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const stockReceiptSchema = new mongoose.Schema(
+const purchaseOrderSchema = new mongoose.Schema(
   {
     product: {
       type: mongoose.Schema.Types.ObjectId,
@@ -14,7 +14,6 @@ const stockReceiptSchema = new mongoose.Schema(
     },
     quantityReceived: { type: Number, required: true },
     costPerUnit: { type: Number, required: true },
-    totalCost: { type: Number, required: true },
     receivedDate: { type: Date, default: Date.now },
     notes: { type: String, default: "" },
     receivedBy: {
@@ -22,8 +21,13 @@ const stockReceiptSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    status: {
+      type: String,
+      enum: ["pending", "received", "cancelled"],
+      default: "pending",
+    },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("StockReceipt", stockReceiptSchema);
+export default mongoose.model("Purchase Order", purchaseOrderSchema);

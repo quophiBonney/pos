@@ -6,7 +6,6 @@ const productSchema = new mongoose.Schema(
     sku: { type: String, unique: true, required: true, trim: true },
     barcode: { type: String, unique: true, sparse: true },
     description: { type: String, default: "" },
-    productImage: { type: String, default: "" },
     category: { type: String, required: true },
     supplier: { type: mongoose.Schema.Types.ObjectId, ref: "Supplier" },
     basePrice: { type: Number, required: true }, // before tax

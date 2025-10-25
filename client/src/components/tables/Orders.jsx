@@ -82,11 +82,12 @@ const OrdersTable = () => {
   );
 
   // ✅ Format templates
-  const itemsBodyTemplate = (rowData) =>
+  const itemsBodyTemplate = (rowData) => {
+     console.log(rowData);
     rowData.items
       .map((item) => `${item.name || "Unknown"} (x${item.quantity})`)
       .join(", ");
-
+  }
   const userBodyTemplate = (rowData) =>
     rowData.user?.email || <span className="text-gray-400 italic">Guest</span>;
 

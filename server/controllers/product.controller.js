@@ -1,6 +1,6 @@
 import Product from "../models/product.model.js";
 import Taxes from "../models/tax.model.js";
-import StockReceipt from "../models/stockReceipt.model.js";
+import StockReceipt from "../models/purchaseOrder.model.js";
 import xlsx from "xlsx";
 
 /**

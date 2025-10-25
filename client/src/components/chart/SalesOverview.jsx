@@ -101,33 +101,6 @@ const SalesOverview = () => {
     return dateStr;
   };
 
-  const statsCards = [
-    {
-      title: "Total Products",
-      value: stats.totalProducts,
-      icon: <InventoryIcon sx={{ fontSize: 40, color: "primary.main" }} />,
-      color: "#1976d2",
-    },
-    {
-      title: "Total Users",
-      value: stats.totalUsers,
-      icon: <PeopleIcon sx={{ fontSize: 40, color: "success.main" }} />,
-      color: "#2e7d32",
-    },
-    {
-      title: "Total Orders",
-      value: stats.totalOrders,
-      icon: <ShoppingCartIcon sx={{ fontSize: 40, color: "warning.main" }} />,
-      color: "#ed6c02",
-    },
-    {
-      title: "Total Revenue",
-      value: formatCurrency(stats.totalRevenue),
-      icon: <MoneyIcon sx={{ fontSize: 40, color: "error.main" }} />,
-      color: "#d32f2f",
-    },
-  ];
-
   if (loading) {
     return (
       <Box
@@ -151,43 +124,6 @@ const SalesOverview = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
-        Sales Overview
-      </Typography>
-
-      {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statsCards.map((card, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card
-              sx={{
-                height: "100%",
-                background: `linear-gradient(135deg, ${card.color}15 0%, ${card.color}05 100%)`,
-                border: `1px solid ${card.color}20`,
-              }}
-            >
-              <CardContent sx={{ p: 3 }}>
-                <Box
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="space-between"
-                >
-                  <Box>
-                    <Typography color="text.secondary" gutterBottom>
-                      {card.title}
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {card.value}
-                    </Typography>
-                  </Box>
-                  {card.icon}
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
       {/* Sales Chart */}
       <Card sx={{ mb: 3 }}>
         <CardContent sx={{ p: 3 }}>
